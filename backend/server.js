@@ -27,6 +27,7 @@ app.get("/", (req, res) => {
 
 const users = [];
 const engagedUsers = {}; // Track engaged users
+const engagedPairs = []; // Track engaged pairs
 
 io.on("connection", (socket) => {
   console.log("New client connected", socket.id);
@@ -42,6 +43,8 @@ io.on("connection", (socket) => {
       console.log(`Matching ${socket.id} with ${match.id}`);
       engagedUsers[socket.id] = true;
       engagedUsers[match.id] = true;
+      engagedPairs.push({ user1: socket.id, user2: match.id });
+      console.log("Current engaged pairs:", engagedPairs);
       socket.emit("match-found", match.id);
       match.emit("match-found", socket.id);
     } else {
@@ -52,7 +55,23 @@ io.on("connection", (socket) => {
   // Handle next button
   socket.on("next", () => {
     console.log(`${socket.id} clicked next`);
-    engagedUsers[socket.id] = false;
+
+    // Find the pair involving this socket
+    const pair = engagedPairs.find(
+      (pair) => pair.user1 === socket.id || pair.user2 === socket.id
+    );
+
+    if (pair) {
+      // Find the other user in the pair
+      const remoteUserId = pair.user1 === socket.id ? pair.user2 : pair.user1;
+      engagedUsers[socket.id] = false;
+      engagedUsers[remoteUserId] = false;
+
+      // Remove the pair from engagedPairs
+      engagedPairs.splice(engagedPairs.indexOf(pair), 1);
+      console.log("Current engaged pairs:", engagedPairs);
+    }
+
     findMatch();
   });
 
@@ -66,6 +85,17 @@ io.on("connection", (socket) => {
       users.splice(index, 1);
     }
     delete engagedUsers[socket.id];
+
+    // Remove from engaged pairs
+    for (let i = engagedPairs.length - 1; i >= 0; i--) {
+      if (
+        engagedPairs[i].user1 === socket.id ||
+        engagedPairs[i].user2 === socket.id
+      ) {
+        engagedPairs.splice(i, 1);
+      }
+    }
+    console.log("Current engaged pairs:", engagedPairs);
   });
 });
 
