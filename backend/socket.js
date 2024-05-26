@@ -1,5 +1,10 @@
 const socketIo = require("socket.io");
-const { handleSocketConnection } = require("./controllers/matchController");
+const {
+  addUser,
+  handleNext,
+  handleDisconnect,
+  getTargetSocketId,
+} = require("./services/matchingService");
 
 const socketSetup = (server) => {
   const io = socketIo(server, {
@@ -11,7 +16,23 @@ const socketSetup = (server) => {
   });
 
   io.on("connection", (socket) => {
-    handleSocketConnection(io, socket);
+    addUser(socket);
+
+    socket.on("next", () => {
+      handleNext(socket);
+    });
+
+    socket.on("ice-candidate", (candidate) => {
+      const targetSocketId = getTargetSocketId(socket.id);
+      if (targetSocketId) {
+        io.to(targetSocketId).emit("ice-candidate", candidate);
+      }
+    });
+
+    socket.on("disconnect", (reason) => {
+      handleDisconnect(socket);
+      console.log("Client disconnected", socket.id, "reason:", reason);
+    });
   });
 };
 
