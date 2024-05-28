@@ -67,25 +67,33 @@ function App() {
         await peerConnection.current.setRemoteDescription(
           new RTCSessionDescription(offer)
         );
-        // const answer = await peerConnection.current.createAnswer();
-        // await peerConnection.current.setLocalDescription(answer);
-        // socket.emit("answer", answer);
-        // console.log("Sent answer: ", answer);
+        const answer = await peerConnection.current.createAnswer();
+        await peerConnection.current.setLocalDescription(answer);
+        socket.emit("answer", answer);
+        console.log("Sent answer: ", answer);
       } catch (e) {
         console.error("Error handling offer", e);
       }
     });
 
-    // socket.on("answer", async (answer) => {
-    //   console.log("Received answer: ", answer);
-    //   try {
-    //     await peerConnection.current.setRemoteDescription(
-    //       new RTCSessionDescription(answer)
-    //     );
-    //   } catch (e) {
-    //     console.error("Error handling answer", e);
-    //   }
-    // });
+    socket.on("answer", async (answer) => {
+      console.log("Received answer: ", answer);
+      try {
+        if (peerConnection.current.signalingState === "have-local-offer") {
+          await peerConnection.current.setRemoteDescription(
+            new RTCSessionDescription(answer)
+          );
+          console.log("answer set");
+        } else {
+          console.error(
+            "Received answer in wrong state:",
+            peerConnection.current.signalingState
+          );
+        }
+      } catch (e) {
+        console.error("Error handling answer", e);
+      }
+    });
 
     const setupWebRTC = async (createOffer) => {
       peerConnection.current = new RTCPeerConnection({
