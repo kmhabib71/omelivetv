@@ -6,9 +6,23 @@ const socket = io("http://localhost:5000");
 
 function App() {
   const localStream = useRef(null);
+  const remoteStreamRef = useRef(null);
   const peerConnection = useRef(null);
 
   useEffect(() => {
+    const init = async () => {
+      localStream.current = await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: true,
+      });
+
+      if (localStream.current) {
+        document.getElementById("localVideo").srcObject = localStream.current;
+        // console.log("localStream.current: ", localStream.current);
+      }
+    };
+    init();
+
     console.log("Trying to connect to Socket.io server");
     socket.on("connect", () => {
       console.log("Connected to Socket.io server");
@@ -17,7 +31,8 @@ function App() {
 
     socket.on("match-found", async (matchId) => {
       console.log(`Matched with: ${matchId}`);
-      await setupWebRTC();
+
+      await setupWebRTC(true);
     });
 
     socket.on("disconnect", () => {
@@ -28,54 +43,127 @@ function App() {
       console.error("Connection error:", error);
     });
 
-    socket.on("ice-candidate", async (candidate) => {
+    // socket.on("ice-candidate", async (candidate) => {
+    //   try {
+    //     if (peerConnection.current) {
+    //       await peerConnection.current.addIceCandidate(
+    //         new RTCIceCandidate(candidate)
+    //       );
+    //       console.log("Received ICE candidate: ", candidate);
+    //     }
+    //   } catch (e) {
+    //     console.error("Error adding received ice candidate", e);
+    //   }
+    // });
+
+    socket.on("offer", async (offer) => {
+      console.log("Received offer: ", offer);
+      await init(); // Ensure localStream is initialized for the receiver
+
+      await setupWebRTC(false);
+
       try {
-        await peerConnection.current.addIceCandidate(candidate);
+        console.log("set remotedescription");
+        await peerConnection.current.setRemoteDescription(
+          new RTCSessionDescription(offer)
+        );
+        // const answer = await peerConnection.current.createAnswer();
+        // await peerConnection.current.setLocalDescription(answer);
+        // socket.emit("answer", answer);
+        // console.log("Sent answer: ", answer);
       } catch (e) {
-        console.error("Error adding received ice candidate", e);
+        console.error("Error handling offer", e);
       }
     });
+
+    // socket.on("answer", async (answer) => {
+    //   console.log("Received answer: ", answer);
+    //   try {
+    //     await peerConnection.current.setRemoteDescription(
+    //       new RTCSessionDescription(answer)
+    //     );
+    //   } catch (e) {
+    //     console.error("Error handling answer", e);
+    //   }
+    // });
+
+    const setupWebRTC = async (createOffer) => {
+      peerConnection.current = new RTCPeerConnection({
+        iceServers: [
+          { urls: "stun:stun.l.google.com:19302" },
+          {
+            urls: "turn:your.turn.server:3478",
+            username: "your_username",
+            credential: "your_password",
+          },
+        ],
+      });
+
+      // peerConnection.current.onicecandidate = (event) => {
+      //   if (event.candidate) {
+      //     socket.emit("ice-candidate", event.candidate);
+      //     console.log("Sent ICE candidate: ", event.candidate);
+      //   }
+      // };
+
+      // peerConnection.current.ontrack = (event) => {
+      //   if (remoteStreamRef.current) {
+      //     remoteStreamRef.current.srcObject = event.streams[0];
+      //     console.log("Received remote stream: ", event.streams[0]);
+      //   }
+      // };
+
+      // console.log("localStream.current: ", localStream.current);
+      if (localStream.current) {
+        console.log(
+          "PeerConnection before adding localtrack: ",
+          peerConnection
+        );
+        localStream.current.getTracks().forEach((track) => {
+          peerConnection.current.addTrack(track, localStream.current);
+          const senders = peerConnection.current.getSenders();
+          console.log(
+            "PeerConnection senders after adding local tracks:",
+            senders
+          );
+        });
+        console.log("getTracks added in peerConnection");
+      } else {
+        console.error("Local stream is not initialized");
+        return;
+      }
+
+      if (createOffer) {
+        try {
+          const offer = await peerConnection.current.createOffer();
+
+          await peerConnection.current.setLocalDescription(offer);
+          socket.emit("offer", offer);
+
+          console.log("Sent offer: ", offer);
+        } catch (e) {
+          console.error("Error creating offer", e);
+        }
+      }
+    };
 
     return () => {
       if (socket.connected) {
         console.log("Disconnecting from Socket.io server");
         socket.disconnect();
       }
+      if (peerConnection.current) {
+        peerConnection.current.close();
+        peerConnection.current = null;
+      }
     };
   }, []);
 
-  const setupWebRTC = async () => {
-    peerConnection.current = new RTCPeerConnection({
-      iceServers: [
-        { urls: "stun:stun.l.google.com:19302" },
-        {
-          urls: "turn:your.turn.server:3478",
-          username: "your_username",
-          credential: "your_password",
-        },
-      ],
-    });
-
-    peerConnection.current.onicecandidate = (event) => {
-      if (event.candidate) {
-        socket.emit("ice-candidate", event.candidate);
-      }
-    };
-
-    localStream.current = await navigator.mediaDevices.getUserMedia({
-      video: true,
-      audio: true,
-    });
-    localStream.current.getTracks().forEach((track) => {
-      peerConnection.current.addTrack(track, localStream.current);
-    });
-
-    if (localStream.current) {
-      document.getElementById("localVideo").srcObject = localStream.current;
-    }
-  };
-
   const handleNext = () => {
+    if (peerConnection.current) {
+      peerConnection.current.close();
+      peerConnection.current = null;
+    }
     socket.emit("next");
   };
 
@@ -90,6 +178,12 @@ function App() {
           Next
         </button>
         <video id="localVideo" autoPlay playsInline className="w-1/2"></video>
+        <video
+          ref={remoteStreamRef}
+          id="remoteVideo"
+          autoPlay
+          playsInline
+          className="w-1/2"></video>
       </div>
     </div>
   );

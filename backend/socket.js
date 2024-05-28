@@ -29,6 +29,20 @@ const socketSetup = (server) => {
       }
     });
 
+    socket.on("offer", (offer) => {
+      const targetSocketId = getTargetSocketId(socket.id);
+      if (targetSocketId) {
+        io.to(targetSocketId).emit("offer", offer);
+      }
+    });
+
+    socket.on("answer", (answer) => {
+      const targetSocketId = getTargetSocketId(socket.id);
+      if (targetSocketId) {
+        io.to(targetSocketId).emit("answer", answer);
+      }
+    });
+
     socket.on("disconnect", (reason) => {
       handleDisconnect(socket);
       console.log("Client disconnected", socket.id, "reason:", reason);
