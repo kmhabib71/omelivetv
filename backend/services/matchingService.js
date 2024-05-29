@@ -14,9 +14,10 @@ const findMatch = (socket) => {
     engagedUsers[match.id] = true;
     engagedPairs.push({ user1: socket.id, user2: match.id });
     socket.emit("match-found", match.id);
-    match.emit("match-found", socket.id);
+    match.emit("match-found-for-remote", socket.id);
   }
   console.log("Engaged Users after match: ", engagedUsers);
+  // console.log("allusers: ", users);
 };
 
 const handleNext = (io, socket) => {
@@ -56,7 +57,7 @@ const handleDisconnect = (io, socket) => {
       io.to(otherUserId).emit("user-disconnected", socket.id); // Notify the other user
       engagedPairs.splice(i, 1);
       engagedUsers[otherUserId] = false; // Reset state for remaining user
-      findMatch(io.sockets.sockets.get(otherUserId)); // Try to find a new match for the remaining user
+      // findMatch(io.sockets.sockets.get(otherUserId)); // Try to find a new match for the remaining user
       console.log("Engaged Users after Disconnect: ", engagedUsers);
     }
   }

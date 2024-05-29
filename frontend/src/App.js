@@ -32,6 +32,11 @@ function App() {
     socket.on("match-found", async (matchId) => {
       console.log(`Matched with: ${matchId}`);
 
+      await setupWebRTC(false);
+    });
+    socket.on("match-found-for-remote", async (matchId) => {
+      console.log(`Matched with as remote: ${matchId}`);
+
       await setupWebRTC(true);
     });
 
@@ -94,24 +99,45 @@ function App() {
         console.error("Error handling answer", e);
       }
     });
-    const handleRemoteDisconnection = () => {
-      // Close the peer connection
+    const handleRemoteDisconnection = async () => {
+      // Check if there is a peer connection
       if (peerConnection.current) {
+        // Handle the ICE connection state change
+        peerConnection.current.oniceconnectionstatechange = () => {
+          console.log(
+            "iceConnectionState: ",
+            peerConnection.current.iceConnectionState
+          );
+        };
+
+        // Close the peer connection
         peerConnection.current.close();
+
+        // Log the state after closing
+        console.log(
+          "iceConnectionState after close: ",
+          peerConnection.current.iceConnectionState
+        );
+
+        // Set the peer connection to null
         peerConnection.current = null;
       }
+
       // Clear the remote video stream
       if (remoteStreamRef.current) {
         remoteStreamRef.current.srcObject = null;
       }
+
       console.log("Handled remote disconnection.");
     };
+
     const findNewMatch = () => {
       socket.emit("next");
+      console.log("findNewMatch");
     };
-    socket.on("user-disconnected", (userId) => {
+    socket.on("user-disconnected", async (userId) => {
       console.log("User disconnected:", userId);
-      handleRemoteDisconnection();
+      await handleRemoteDisconnection();
       findNewMatch();
     });
     const setupWebRTC = async (createOffer) => {
@@ -126,38 +152,41 @@ function App() {
         ],
       });
 
-      // Monitor ICE connection state
       peerConnection.current.oniceconnectionstatechange = () => {
-        console.log(
-          "ICE connection state:",
-          peerConnection.current.iceConnectionState
-        );
+        const iceState = peerConnection.current.iceConnectionState;
+        console.log("ICE connection state:", iceState);
+
         if (
-          peerConnection.current.iceConnectionState === "disconnected" ||
-          peerConnection.current.iceConnectionState === "failed" ||
-          peerConnection.current.iceConnectionState === "closed"
+          iceState === "disconnected" ||
+          iceState === "failed" ||
+          iceState === "closed"
         ) {
           console.log(
             "ICE connection state indicates remote peer has closed the connection."
           );
-          handleRemoteDisconnection();
-        } else if (
-          peerConnection.current.iceConnectionState === "connected" ||
-          peerConnection.current.iceConnectionState === "completed"
-        ) {
+          // handleRemoteDisconnection();
+          findNewMatch();
+        } else if (iceState === "connected" || iceState === "completed") {
           console.log("ICE connection established successfully.");
           checkIceCandidateState(peerConnection.current);
+        } else if (iceState === "new") {
+          console.log("ICE connection state is new, gathering candidates.");
+        } else if (iceState === "checking") {
+          console.log(
+            "ICE connection state is checking, waiting for connection."
+          );
         } else {
-          console.log("Nothing working");
+          console.log("Unknown ICE connection state:", iceState);
         }
       };
+
       peerConnection.current.onsignalingstatechange = () => {
         console.log("Signaling state:", peerConnection.current.signalingState);
         if (peerConnection.current.signalingState === "closed") {
           console.log(
             "Signaling state indicates remote peer has closed the connection."
           );
-          handleRemoteDisconnection();
+          // handleRemoteDisconnection();
         }
       };
 
@@ -242,13 +271,40 @@ function App() {
   }, []);
 
   const handleNext = () => {
+    // Ensure cleanup before moving to the next user
     if (peerConnection.current) {
+      // Handle the ICE connection state change
+      peerConnection.current.oniceconnectionstatechange = () => {
+        console.log(
+          "iceConnectionState: ",
+          peerConnection.current.iceConnectionState
+        );
+      };
+
+      // Close the peer connection
       peerConnection.current.close();
+
+      // Log the state after closing
+      console.log(
+        "iceConnectionState after close: ",
+        peerConnection.current.iceConnectionState
+      );
+
+      // Set the peer connection to null
       peerConnection.current = null;
     }
-    socket.emit("next");
-  };
 
+    // Clear the remote video stream
+    if (remoteStreamRef.current) {
+      remoteStreamRef.current.srcObject = null;
+    }
+    console.log("Next Button clicked");
+    // if (localStream.current) {
+    //   localStream.current.getTracks().forEach((track) => track.stop());
+    //   localStream.current = null;
+    // }
+    // socket.emit("next");
+  };
   return (
     <div className="h-screen flex items-center justify-center bg-gray-100">
       <div className="p-6 max-w-sm mx-auto bg-white rounded-xl shadow-md flex flex-col items-center space-y-4">
