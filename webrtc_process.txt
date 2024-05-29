@@ -1,0 +1,50 @@
+Steps and Phases in WebRTC Signaling
+
+
+Create RTCPeerConnection:
+Initialize an RTCPeerConnection object.
+
+
+Add Media Tracks:
+Add local media tracks (audio/video) to the RTCPeerConnection using addTrack.
+
+
+Create Offer:
+One peer creates an offer using createOffer and sets it as the local description using setLocalDescription.
+
+
+ICE Gathering Phase:
+When setLocalDescription is called with the offer, the ICE agent begins gathering ICE candidates.
+During this phase, the onicecandidate event will be triggered each time a new ICE candidate is found.
+
+
+Send Offer to Remote Peer:
+The local peer sends the offer (including any gathered ICE candidates) to the remote peer via the signaling server.
+
+
+Set Remote Description (Offer):
+The remote peer receives the offer and sets it as the remote description using setRemoteDescription.
+
+
+Add Media Tracks (Remote Peer):
+The remote peer also adds its local media tracks to the RTCPeerConnection.
+
+
+Create Answer:
+The remote peer creates an answer using createAnswer and sets it as the local description using setLocalDescription.
+
+
+ICE Gathering Phase (Remote Peer):
+Similar to the offerer, the answerer will start gathering ICE candidates when setLocalDescription is called.
+The onicecandidate event fires each time an ICE candidate is found.
+
+
+Send Answer to Offerer:
+The remote peer sends the answer (including any gathered ICE candidates) back to the offerer via the signaling server.
+
+
+Set Remote Description (Answer):
+The offerer receives the answer and sets it as the remote description using setRemoteDescription.
+Exchange ICE Candidates:
+
+Both peers continue to exchange ICE candidates through the signaling server until the ICE connection state reaches connected or completed

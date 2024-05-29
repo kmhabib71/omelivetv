@@ -43,18 +43,18 @@ function App() {
       console.error("Connection error:", error);
     });
 
-    // socket.on("ice-candidate", async (candidate) => {
-    //   try {
-    //     if (peerConnection.current) {
-    //       await peerConnection.current.addIceCandidate(
-    //         new RTCIceCandidate(candidate)
-    //       );
-    //       console.log("Received ICE candidate: ", candidate);
-    //     }
-    //   } catch (e) {
-    //     console.error("Error adding received ice candidate", e);
-    //   }
-    // });
+    socket.on("ice-candidate", async (candidate) => {
+      try {
+        if (peerConnection.current) {
+          await peerConnection.current.addIceCandidate(
+            new RTCIceCandidate(candidate)
+          );
+          console.log("Received ICE candidate: ", candidate);
+        }
+      } catch (e) {
+        console.error("Error adding received ice candidate", e);
+      }
+    });
 
     socket.on("offer", async (offer) => {
       console.log("Received offer: ", offer);
@@ -107,19 +107,54 @@ function App() {
         ],
       });
 
-      // peerConnection.current.onicecandidate = (event) => {
-      //   if (event.candidate) {
-      //     socket.emit("ice-candidate", event.candidate);
-      //     console.log("Sent ICE candidate: ", event.candidate);
-      //   }
-      // };
+      // Monitor ICE connection state
+      peerConnection.current.oniceconnectionstatechange = () => {
+        console.log(
+          "ICE connection state:",
+          peerConnection.current.iceConnectionState
+        );
+        if (
+          peerConnection.current.iceConnectionState === "connected" ||
+          peerConnection.current.iceConnectionState === "completed"
+        ) {
+          console.log("ICE connection established successfully.");
+          checkIceCandidateState(peerConnection.current);
+        }
+      };
 
-      // peerConnection.current.ontrack = (event) => {
-      //   if (remoteStreamRef.current) {
-      //     remoteStreamRef.current.srcObject = event.streams[0];
-      //     console.log("Received remote stream: ", event.streams[0]);
-      //   }
-      // };
+      // Function to check ICE candidate stats
+      function checkIceCandidateState(pc) {
+        pc.getStats(null)
+          .then((stats) => {
+            stats.forEach((report) => {
+              if (
+                report.type === "candidate-pair" &&
+                report.state === "succeeded"
+              ) {
+                console.log("ICE candidate pair state: connected");
+                console.log("Local candidate:", report.localCandidateId);
+                console.log("Remote candidate:", report.remoteCandidateId);
+              }
+            });
+          })
+          .catch((error) => {
+            console.error("Error getting stats:", error);
+          });
+      }
+
+      peerConnection.current.onicecandidate = (event) => {
+        if (event.candidate) {
+          socket.emit("ice-candidate", event.candidate);
+          console.log("Sent ICE candidate: ", event.candidate);
+        }
+      };
+
+      peerConnection.current.ontrack = (event) => {
+        if (remoteStreamRef.current) {
+          remoteStreamRef.current.srcObject = event.streams[0];
+          console.log("Received remote stream: ", event.streams[0]);
+        }
+      };
 
       // console.log("localStream.current: ", localStream.current);
       if (localStream.current) {
@@ -185,7 +220,12 @@ function App() {
           className="p-2 bg-blue-500 text-white rounded">
           Next
         </button>
-        <video id="localVideo" autoPlay playsInline className="w-1/2"></video>
+        <video
+          id="localVideo"
+          autoPlay
+          playsInline
+          muted
+          className="w-1/2"></video>
         <video
           ref={remoteStreamRef}
           id="remoteVideo"
