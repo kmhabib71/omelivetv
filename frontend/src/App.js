@@ -94,7 +94,26 @@ function App() {
         console.error("Error handling answer", e);
       }
     });
-
+    const handleRemoteDisconnection = () => {
+      // Close the peer connection
+      if (peerConnection.current) {
+        peerConnection.current.close();
+        peerConnection.current = null;
+      }
+      // Clear the remote video stream
+      if (remoteStreamRef.current) {
+        remoteStreamRef.current.srcObject = null;
+      }
+      console.log("Handled remote disconnection.");
+    };
+    const findNewMatch = () => {
+      socket.emit("next");
+    };
+    socket.on("user-disconnected", (userId) => {
+      console.log("User disconnected:", userId);
+      handleRemoteDisconnection();
+      findNewMatch();
+    });
     const setupWebRTC = async (createOffer) => {
       peerConnection.current = new RTCPeerConnection({
         iceServers: [
@@ -114,11 +133,31 @@ function App() {
           peerConnection.current.iceConnectionState
         );
         if (
+          peerConnection.current.iceConnectionState === "disconnected" ||
+          peerConnection.current.iceConnectionState === "failed" ||
+          peerConnection.current.iceConnectionState === "closed"
+        ) {
+          console.log(
+            "ICE connection state indicates remote peer has closed the connection."
+          );
+          handleRemoteDisconnection();
+        } else if (
           peerConnection.current.iceConnectionState === "connected" ||
           peerConnection.current.iceConnectionState === "completed"
         ) {
           console.log("ICE connection established successfully.");
           checkIceCandidateState(peerConnection.current);
+        } else {
+          console.log("Nothing working");
+        }
+      };
+      peerConnection.current.onsignalingstatechange = () => {
+        console.log("Signaling state:", peerConnection.current.signalingState);
+        if (peerConnection.current.signalingState === "closed") {
+          console.log(
+            "Signaling state indicates remote peer has closed the connection."
+          );
+          handleRemoteDisconnection();
         }
       };
 

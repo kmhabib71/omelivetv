@@ -3,6 +3,7 @@ const engagedUsers = {}; // Track engaged users
 const engagedPairs = []; // Track engaged pairs
 
 const findMatch = (socket) => {
+  console.log("Engaged Users before match: ", engagedUsers);
   const availableUsers = users.filter(
     (user) => user !== socket && !engagedUsers[user.id]
   );
@@ -15,9 +16,10 @@ const findMatch = (socket) => {
     socket.emit("match-found", match.id);
     match.emit("match-found", socket.id);
   }
+  console.log("Engaged Users after match: ", engagedUsers);
 };
 
-const handleNext = (socket) => {
+const handleNext = (io, socket) => {
   const pair = engagedPairs.find(
     (pair) => pair.user1 === socket.id || pair.user2 === socket.id
   );
@@ -28,12 +30,14 @@ const handleNext = (socket) => {
     engagedUsers[remoteUserId] = false;
 
     engagedPairs.splice(engagedPairs.indexOf(pair), 1);
+    io.to(remoteUserId).emit("user-disconnected", socket.id); // Notify the other user
   }
 
   findMatch(socket);
 };
 
-const handleDisconnect = (socket) => {
+const handleDisconnect = (io, socket) => {
+  console.log("Engaged Users before Disconnect: ", engagedUsers);
   const index = users.indexOf(socket);
   if (index !== -1) {
     users.splice(index, 1);
@@ -45,7 +49,15 @@ const handleDisconnect = (socket) => {
       engagedPairs[i].user1 === socket.id ||
       engagedPairs[i].user2 === socket.id
     ) {
+      const otherUserId =
+        engagedPairs[i].user1 === socket.id
+          ? engagedPairs[i].user2
+          : engagedPairs[i].user1;
+      io.to(otherUserId).emit("user-disconnected", socket.id); // Notify the other user
       engagedPairs.splice(i, 1);
+      engagedUsers[otherUserId] = false; // Reset state for remaining user
+      findMatch(io.sockets.sockets.get(otherUserId)); // Try to find a new match for the remaining user
+      console.log("Engaged Users after Disconnect: ", engagedUsers);
     }
   }
 };

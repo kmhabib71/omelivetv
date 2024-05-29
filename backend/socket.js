@@ -19,7 +19,7 @@ const socketSetup = (server) => {
     addUser(socket);
 
     socket.on("next", () => {
-      handleNext(socket);
+      handleNext(io, socket);
     });
 
     socket.on("ice-candidate", (candidate) => {
@@ -44,7 +44,7 @@ const socketSetup = (server) => {
     });
 
     socket.on("disconnect", (reason) => {
-      handleDisconnect(socket);
+      handleDisconnect(io, socket);
       console.log("Client disconnected", socket.id, "reason:", reason);
     });
   });
