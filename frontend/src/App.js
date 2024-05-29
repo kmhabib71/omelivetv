@@ -140,6 +140,11 @@ function App() {
       await handleRemoteDisconnection();
       findNewMatch();
     });
+    socket.on("user-disconnected-by-next", async (userId) => {
+      console.log("User disconnected:", userId);
+      await handleRemoteDisconnection();
+      // findNewMatch();
+    });
     const setupWebRTC = async (createOffer) => {
       peerConnection.current = new RTCPeerConnection({
         iceServers: [
@@ -165,7 +170,7 @@ function App() {
             "ICE connection state indicates remote peer has closed the connection."
           );
           // handleRemoteDisconnection();
-          findNewMatch();
+          // findNewMatch();
         } else if (iceState === "connected" || iceState === "completed") {
           console.log("ICE connection established successfully.");
           checkIceCandidateState(peerConnection.current);
@@ -303,7 +308,7 @@ function App() {
     //   localStream.current.getTracks().forEach((track) => track.stop());
     //   localStream.current = null;
     // }
-    // socket.emit("next");
+    socket.emit("next");
   };
   return (
     <div className="h-screen flex items-center justify-center bg-gray-100">

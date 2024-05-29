@@ -31,7 +31,7 @@ const handleNext = (io, socket) => {
     engagedUsers[remoteUserId] = false;
 
     engagedPairs.splice(engagedPairs.indexOf(pair), 1);
-    io.to(remoteUserId).emit("user-disconnected", socket.id); // Notify the other user
+    io.to(remoteUserId).emit("user-disconnected-by-next", socket.id); // Notify the other user
   }
 
   findMatch(socket);
